@@ -94,6 +94,8 @@ void loop() {
        temp /= 2;
        //int hum = humSensor.temperature;
        
+       uint16_t lux = lightMeter.readLightLevel();
+       
        radioInit(); //Init radio as Tx
        radio.setTXaddress((void*)txaddr);
 
@@ -121,33 +123,31 @@ void loop() {
        int i;
        radio.print(rxaddr[4]); //Send my Address
        radio.print(";");
-       for (i = 0; i < SENSOR_COUNT; i++){
+       for (i = 0; i < SENSOR_COUNT; i++){ //Send sensor data
          sum += sensorData[i];
          radio.print(sensorData[i]);
-         radio.print(";");
+         radio.print(";"); //Semicolon-separated values
        }
-       byte hash = (sum%256); //Simple hash to avoid errors
+       byte hash = (sum%256); //Simple hash used as checksum
        radio.print(hash);
        radio.print(";");
-       radio.flush();
-       digitalWrite(P1_0, LOW);
-       
+       radio.flush(); //Send the data that has been put in the radio's output buffer
+       digitalWrite(P1_0, LOW); //Data sent, turn LED OFF.       
     }
   }
   
-  
   now = timeMinutes();
   start = now;
-  while(!validateTimeOut()){
+  while(!validateTimeOut()){ //Periodically check: is it now time to wake up?
     now = timeMinutes();
-    dco1MHz();
-    __bis_status_register(LPM1_bits);
+    dco1MHz(); //Set DCO's speed to 1MHz
+    __bis_status_register(LPM1_bits); //Low-Power Mode 1
   } 
 }
 
-byte validateTimeOut(){
+byte validateTimeOut(){ //Has already passed enough time to wake up?
    unsigned int localNow = now;
-   if (start > localNow){
+   if (start > localNow){ //Just in case an overflow exist
      localNow += 3600; 
    }
    if (localNow < (start + TIME_OUT)){
