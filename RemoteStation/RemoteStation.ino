@@ -22,7 +22,7 @@ BH1750 lightMeter;
 dht11 humSensor;
 RealTimeClock rtc;
 
-const uint8_t rxaddr[] = { 0xDE, 0xAD, 0xBE, 0xEF, 0x04 };
+const uint8_t rxaddr[] = { 0xDE, 0xAD, 0xBE, 0xEF, 0x01 };
 const uint8_t txaddr[] = { 0xDE, 0xAD, 0xBE, 0xEF, 0x00 };
 int TIME_OUT = 15; //Timeout before enabling RX radio
 unsigned int now, start;
