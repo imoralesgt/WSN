@@ -6,7 +6,7 @@
 #include <RTCplus.h>
 
 #define MAX_RETRIES 3  //3 max retransmission attempts
-#define RTY_TIMEOUT 2  //3 seconds timeout before attempting retransmission
+#define RTY_TIMEOUT 1  //1 second for timeout before attempting retransmission
 
 const byte IRQ_PIN         = P2_2; //NRF24L01+ IRQ Pin
 const byte CE_PIN          = P2_0; //NRF24L01+ CE Pin
@@ -50,7 +50,7 @@ void countRemoteStations(void){
          digitalRead(STN_CNT_PINS[1])*2 +
          digitalRead(STN_CNT_PINS[2])*4;
   */
-  cnt = 4; //Just for debugging
+  cnt = 1; //Just for debugging
   STATIONS_COUNT = cnt;
 }
 
@@ -111,15 +111,28 @@ byte verifyHash(char *buffer){
     return 0;
   }
 }
+
+void dumpTimeToSerial(void){
+  byte hrs  = rtc.RTC_hr;
+  byte mins = rtc.RTC_min;
+  byte secs = rtc.RTC_sec;
+  if (hrs < 10)
+    Serial.print("0");
+  Serial.print(hrs, DEC);
+  Serial.print(":");
+  if (mins < 10)
+    Serial.print("0");
+  Serial.print(mins, DEC);
+  Serial.print(":");
+  if (secs < 10)
+    Serial.print("0");
+  Serial.print(secs, DEC);
+  Serial.print(" -->  ");
+}
   
 
 void dumpDataToSerial(char *data){
-  Serial.print(rtc.RTC_hr, DEC);
-  Serial.print(":");
-  Serial.print(rtc.RTC_min, DEC);
-  Serial.print(":");
-  Serial.print(rtc.RTC_sec, DEC);
-  Serial.print(" -->  ");
+  dumpTimeToSerial();
   Serial.print(data);
 }
 
@@ -162,7 +175,7 @@ void dco16MHz(){
  DCOCTL = CALDCO_16MHZ;  
 }
 
-void RQSTandReadData(byte ID, char *inbuf){
+byte RQSTandReadData(byte ID, char *inbuf){
   int now, start, retries, dataValid;
   now = rtc.RTC_sec;
   start = now;
@@ -188,7 +201,8 @@ void RQSTandReadData(byte ID, char *inbuf){
   digitalWrite(RED_LED, LOW);
   
   if(!dataValid){
-    Serial.print("SIN RESPUESTA DE ESTACION REMOTA #");
+    dumpTimeToSerial();
+    Serial.print("SIN RESPUESTA DE ESTACION #");
     Serial.println(ID, DEC);
     failed++;
   }
@@ -198,13 +212,19 @@ void RQSTandReadData(byte ID, char *inbuf){
     if(verifyHash(inbuf)){
       dataValid = 1;
       splitBufferToData(inbuf,sensorData);
-      Serial.println("  OK!");
+      Serial.println("");
+      return 1;
     }else{
       Serial.println("  Error de Hash");
       dataValid = 0;
+      return 0;
     }    
   }
   
+}
+
+void writeToSD(void){
+  ;
 }
 
 void loop() {
@@ -216,8 +236,10 @@ void loop() {
   failed = 0; //Remove deadtime if failure in reading sensor happens
               //This is to improve nodes' battery life
   for(stn = 1; stn <= STATIONS_COUNT; stn++){
-    RQSTandReadData(stn, inbuf);
-    //STORE DATA IN SD CARD HERE FOR EACH STATION!
+    if(RQSTandReadData(stn, inbuf)){
+      writeToSD();
+      //STORE DATA IN SD CARD HERE FOR EACH STATION!
+    }
   }
   radioInit();
 
