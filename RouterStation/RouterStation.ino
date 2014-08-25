@@ -6,12 +6,13 @@
 #include <RTCplus.h>
 
 #define MAX_RETRIES 3  //3 max retransmission attempts
-#define RTY_TIMEOUT 3  //3 seconds timeout before attempting retransmission
+#define RTY_TIMEOUT 2  //3 seconds timeout before attempting retransmission
 
-const byte IRQ_PIN = P2_2; //NRF24L01+ IRQ Pin
-const byte CE_PIN  = P2_0; //NRF24L01+ CE Pin
-const byte CS_PIN  = P2_1; //NRF24L01+ CS Pin
-const byte HUM_PIN = P1_4; //DHT11 Data Pin
+const byte IRQ_PIN         = P2_2; //NRF24L01+ IRQ Pin
+const byte CE_PIN          = P2_0; //NRF24L01+ CE Pin
+const byte CS_PIN          = P2_1; //NRF24L01+ CS Pin
+const byte HUM_PIN         = P1_4; //DHT11 Data Pin
+const byte STN_CNT_PINS[3] = {P2_3, P2_4, P2_5}; //Station Count PINs
 
 Enrf24 radio(CE_PIN, CS_PIN, IRQ_PIN);
 RealTimeClock rtc;
@@ -27,7 +28,10 @@ const char *STR_SET_TIMEOUT = "TIMEOUT";
 
 const int DATA_LEN = 6;
 
-int TIME_OUT = 15;
+unsigned int TIME_OUT = 30;
+byte STATIONS_COUNT = 0;
+unsigned int sensorData[DATA_LEN];
+byte failed=0; //Failed attempts to get date in current sampling
 
 void dump_radio_status_to_serialport(uint8_t);
 
@@ -39,11 +43,34 @@ void radioInit(void){
   radio.setTXaddress((void*)txaddr);
 }
 
+void countRemoteStations(void){
+  byte cnt;
+  /*
+  cnt  = digitalRead(STN_CNT_PINS[0])   +
+         digitalRead(STN_CNT_PINS[1])*2 +
+         digitalRead(STN_CNT_PINS[2])*4;
+  */
+  cnt = 4; //Just for debugging
+  STATIONS_COUNT = cnt;
+}
+
 void setup() {
+  
+  int j;
+
+  for(j = 0; j < 3; j++){
+    pinMode(STN_CNT_PINS[j], INPUT_PULLUP);
+  }
+  
   Serial.begin(9600);
+  countRemoteStations(); //set value on STATIONS_COUNT variable
+  
+  
+  
   pinMode(RED_LED, OUTPUT);
   
   radioInit();
+  
   
   rtc.Set_Time(10,12,0);
   rtc.begin();
@@ -56,7 +83,7 @@ unsigned int deltaSeconds(int start, int now){ //Compute time gap between two sa
   return (now - start);
 }
 
-unsigned int splitBufferToData(char *buffer, unsigned int *data){
+void splitBufferToData(char *buffer, unsigned int *data){
   int i = 0;
   char *token;
   char *search = ";";
@@ -84,6 +111,7 @@ byte verifyHash(char *buffer){
     return 0;
   }
 }
+  
 
 void dumpDataToSerial(char *data){
   Serial.print(rtc.RTC_hr, DEC);
@@ -117,7 +145,7 @@ byte validateSleepTime(unsigned int start, unsigned int now){ //Has already pass
    if (start > localNow){ //Just in case an overflow exist
      localNow += 3600; 
    }
-   if (localNow < (start + TIME_OUT + 1)){
+   if (localNow < (start + TIME_OUT - failed*MAX_RETRIES*RTY_TIMEOUT)){
      return 0;
    }else{
      return 1;
@@ -134,9 +162,7 @@ void dco16MHz(){
  DCOCTL = CALDCO_16MHZ;  
 }
 
-void loop() {
-  delay(1);
-  char inbuf[33];
+void RQSTandReadData(byte ID, char *inbuf){
   int now, start, retries, dataValid;
   now = rtc.RTC_sec;
   start = now;
@@ -149,7 +175,7 @@ void loop() {
     while(deltaSeconds(start,now) < RTY_TIMEOUT){
       digitalWrite(RED_LED, HIGH);
       now = rtc.RTC_sec;
-      sendRadioDataRequest(1);
+      sendRadioDataRequest(ID);
       setRadioRxMode();
       digitalWrite(RED_LED, LOW);
       if(radio.available(true)){
@@ -161,22 +187,42 @@ void loop() {
   }
   digitalWrite(RED_LED, LOW);
   
-  if(!dataValid)
-    Serial.println("SIN RESPUESTA DE ESTACION REMOTA");
+  if(!dataValid){
+    Serial.print("SIN RESPUESTA DE ESTACION REMOTA #");
+    Serial.println(ID, DEC);
+    failed++;
+  }
 
   if(radio.read(inbuf)) {
     dumpDataToSerial(inbuf);   
     if(verifyHash(inbuf)){
+      dataValid = 1;
+      splitBufferToData(inbuf,sensorData);
       Serial.println("  OK!");
     }else{
       Serial.println("  Error de Hash");
+      dataValid = 0;
     }    
   }
   
+}
+
+void loop() {
+  delay(1);
+  char inbuf[33];
+  
+  byte stn;
+
+  failed = 0; //Remove deadtime if failure in reading sensor happens
+              //This is to improve nodes' battery life
+  for(stn = 1; stn <= STATIONS_COUNT; stn++){
+    RQSTandReadData(stn, inbuf);
+    //STORE DATA IN SD CARD HERE FOR EACH STATION!
+  }
   radioInit();
 
-  now = timeMinutes();
-  start = now;
+  int now = timeMinutes();
+  int start = now;
   
   while(!validateSleepTime(start, now)){ //Is it now time to wake up?
     now = timeMinutes();

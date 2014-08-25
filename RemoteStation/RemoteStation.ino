@@ -10,11 +10,12 @@
 
 #define SENSOR_COUNT 4
 
-const byte IRQ_PIN = P2_2; //NRF24L01+ IRQ Pin
-const byte CE_PIN  = P2_0; //NRF24L01+ CE Pin
-const byte CS_PIN  = P2_1; //NRF24L01+ CS Pin
-const byte HUM_PIN = P1_4; //DHT11 Data Pin
-const byte LED1    = P1_0; //RED LED Pin
+const byte IRQ_PIN      = P2_2; //NRF24L01+ IRQ Pin
+const byte CE_PIN       = P2_0; //NRF24L01+ CE Pin
+const byte CS_PIN       = P2_1; //NRF24L01+ CS Pin
+const byte HUM_PIN      = P1_4; //DHT11 Data Pin
+const byte LED1         = P1_0; //RED LED Pin
+const byte ADDR_PINS[3] = {P2_3, P2_4, P2_5};
 
 Enrf24 radio(CE_PIN, CS_PIN, IRQ_PIN);  // P2.0=CE, P2.1=CSN, P2.2=IRQ
 BMP085<0> PSensor;
@@ -22,9 +23,9 @@ BH1750 lightMeter;
 dht11 humSensor;
 RealTimeClock rtc;
 
-const uint8_t rxaddr[] = { 0xDE, 0xAD, 0xBE, 0xEF, 0x01 };
+uint8_t rxaddr[] = { 0xDE, 0xAD, 0xBE, 0xEF, 0x01 };
 const uint8_t txaddr[] = { 0xDE, 0xAD, 0xBE, 0xEF, 0x00 };
-int TIME_OUT = 15; //Timeout before enabling RX radio
+unsigned int TIME_OUT = 30; //Timeout before enabling RX radio
 unsigned int now, start;
 int sensorData[SENSOR_COUNT]; //Temp, Pres, Lux, Hum
 
@@ -46,8 +47,17 @@ unsigned int timeMinutes();
 void radioInit();
 void sensorsInit();
 void enableRx();
+void setLocalAddress(void);
 
 void setup() {
+  
+  byte j;
+  
+  for(j=0; j<3; j++){
+    pinMode(ADDR_PINS[j], INPUT_PULLUP);
+  }
+  
+  setLocalAddress();
   
   pinMode(PUSH2, INPUT_PULLUP);
   delay(100);
@@ -157,6 +167,17 @@ byte validateTimeOut(){ //Has already passed enough time to wake up?
    }
 }
 
+void setLocalAddress(void){
+  byte addr;
+  /*
+  addr = digitalRead(ADDR_PINS[0])   +
+         digitalRead(ADDR_PINS[1])*2 +
+         digitalRead(ADDR_PINS[2])*4;
+  */
+  addr = 1; //Just for debugging 
+  rxaddr[4] = addr;
+}
+
 unsigned int timeMinutes(){
   return rtc.RTC_sec + rtc.RTC_min*60;
 }
@@ -181,7 +202,7 @@ interrupt(TIMER1_A0_VECTOR) Tic_Tac(void){
 };
 
 void enableRx(){
-  radio.setRXaddress((void*)rxaddr);
+  radio.setRXaddress(rxaddr);
   radio.enableRX();
   digitalWrite(LED1, HIGH);
 }
