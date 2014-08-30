@@ -17,6 +17,8 @@ const byte HUM_PIN      = P1_4; //DHT11 Data Pin
 const byte LED1         = P1_0; //RED LED Pin
 const byte ADDR_PINS[3] = {P2_3, P2_4, P2_5};
 
+const uint16_t RADIO_SPEED = 250000;
+
 Enrf24 radio(CE_PIN, CS_PIN, IRQ_PIN);  // P2.0=CE, P2.1=CSN, P2.2=IRQ
 BMP085<0> PSensor;
 BH1750 lightMeter;
@@ -212,7 +214,7 @@ void radioInit(){
   SPI.setDataMode(SPI_MODE0);
   SPI.setBitOrder(MSBFIRST);
   pinMode(IRQ_PIN, INPUT_PULLUP);
-  radio.begin();
+  radio.begin(RADIO_SPEED);
 }
 
 void sensorsInit(){
