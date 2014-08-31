@@ -134,15 +134,15 @@ void loop() {
        long sum = rxaddr[4];
        int i;
        radio.print(rxaddr[4]); //Send my Address
-       radio.print(";");
+       radio.print(",");
        for (i = 0; i < SENSOR_COUNT; i++){ //Send sensor data
          sum += sensorData[i];
          radio.print(sensorData[i]);
-         radio.print(";"); //Semicolon-separated values
+         radio.print(","); //Semicolon-separated values
        }
        byte hash = (sum%256); //Simple hash used as checksum
        radio.print(hash);
-       radio.print(";");
+       radio.print(",");
        radio.flush(); //Send the data that has been put in the radio's output buffer
        digitalWrite(P1_0, LOW); //Data sent, turn LED OFF.       
     }
@@ -225,6 +225,7 @@ void sensorsInit(){
   PSensor.calculate();
 }
 
+/*
 void dump_radio_status_to_serialport(uint8_t status)
 {
   Serial.print("Enrf24 radio transceiver status: ");
@@ -253,3 +254,4 @@ void dump_radio_status_to_serialport(uint8_t status)
       Serial.println("UNKNOWN STATUS CODE");
   }
 }
+*/
