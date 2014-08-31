@@ -12,6 +12,7 @@ const byte CE_PIN          = P2_0; //NRF24L01+ CE Pin
 const byte CS_PIN          = P2_1; //NRF24L01+ CS Pin
 //const byte CS_SD_PIN       = P1_4; //SD Card CS Pin
 const byte STN_CNT_PINS[3] = {P2_3, P2_4, P2_5}; //Station Count PINs
+const byte ENABLE_RADIO_PIN = P1_4; //Enable radio until SD Card is up and working
 
 Enrf24 radio(CE_PIN, CS_PIN, IRQ_PIN);
 RealTimeClock rtc;
@@ -61,6 +62,8 @@ void setup() {
 
   pinMode(RED_LED, OUTPUT);
   pinMode(PUSH2, INPUT_PULLUP);
+  
+  pinMode(ENABLE_RADIO_PIN, INPUT_PULLUP);
 
   //Disable SD Card operations during TEST MODE
 
@@ -69,12 +72,20 @@ void setup() {
     pinMode(STN_CNT_PINS[j], INPUT_PULLUP);
   }
 
-  Serial.begin(115200);
+
+
+  Serial.begin(9600);
   countRemoteStations(); //set value on STATIONS_COUNT variable
+
+  delay(1000);
+
+  while(digitalRead(ENABLE_RADIO_PIN)){
+    ; //Wait until SD uC is ready
+  }
 
   radioInit();
 
-  rtc.Set_Time(21,15,0);
+  rtc.Set_Time(23,42,0);
   rtc.Set_Date(2014,8,30);
   rtc.begin();
 }
@@ -249,6 +260,10 @@ void loop() {
   char inbuf[BUFFER_SIZE];
 
   byte stn;
+  
+  while(digitalRead(ENABLE_RADIO_PIN)){
+    ; //Wait until neighbor uC enables this one
+  }
 
   failed = 0; //Remove deadtime if failure in reading sensor happens
   //This is to improve nodes' battery life

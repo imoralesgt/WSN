@@ -3,6 +3,7 @@
 #include <string.h>
 
 const byte CS_SD_PIN = P1_4;
+const byte ENABLE_RADIO_PIN = P1_7; //Output used to enable neighbor uC
 const uint8_t SD_BUFFER_SIZE = 55;
 
 unsigned short int bw = 0; //SD Card Write buffer
@@ -23,9 +24,10 @@ uint8_t _SCLK = 13;
  */
 
 void die(int pff_err){ //If anything goes wrong, this procedure will be triggered
-  Serial.println();
-  Serial.print("Failed with rc=");
-  Serial.print(pff_err,DEC);
+  //Serial.println();
+  //Serial.print("Failed with rc=");
+  //Serial.print(pff_err,DEC);
+  digitalWrite(ENABLE_RADIO_PIN, HIGH);
   for (;;){
     digitalWrite(RED_LED, 1);
     delay(50);
@@ -42,7 +44,7 @@ void initSDcard(void){
 void openSDfile(void){
   rc = FatFs.open("log.csv");
   if (rc) die(rc);
-  rc = FatFs.write("Fecha,Hora,ID,Temperatura,Presion,Luminosidad,Humedad,\n", 55, &bw);
+  rc = FatFs.write("Fecha,Hora,ID,Temperatura,Presion,Luminosidad,Humedad,Hash,\n", 60, &bw);
   if (rc) die(rc);
 }
 
@@ -57,12 +59,15 @@ void writeToSD(){
 
 void setup(){
   
-  Serial.begin(115200);
+  Serial.begin(9600);
   
   pinMode(RED_LED, OUTPUT);
   digitalWrite(RED_LED, 0);
   
   pinMode(PUSH2, INPUT_PULLUP);
+  
+  pinMode(ENABLE_RADIO_PIN, OUTPUT);
+  digitalWrite(ENABLE_RADIO_PIN, HIGH);
   
   i = 0;
   
@@ -78,6 +83,7 @@ void setup(){
 void loop()
 {
   char data;
+  digitalWrite(ENABLE_RADIO_PIN, LOW); //Neighbor uC ENABLED
   if(enableSD){
     if(Serial.available()>0){
       data = Serial.read();
@@ -85,7 +91,6 @@ void loop()
         writeToSD();
         int j;
         for(j = 0; j < SD_BUFFER_SIZE; j++){
-          //strcpy(buffer,"                                           ");
           buffer[j] = (char)0;
         }
         i = 0;
@@ -95,6 +100,7 @@ void loop()
     }
     
     if(!digitalRead(PUSH2)){
+      digitalWrite(ENABLE_RADIO_PIN, HIGH); //Neighbor uC DISABLED
       FatFs.write(0, 0, &bw);
       die(-1);
     }
