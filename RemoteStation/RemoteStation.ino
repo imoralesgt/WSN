@@ -17,7 +17,8 @@ const byte HUM_PIN      = P1_4; //DHT11 Data Pin
 const byte LED1         = P1_0; //RED LED Pin
 const byte ADDR_PINS[3] = {P2_3, P2_4, P2_5};
 
-const uint16_t RADIO_SPEED = 250000;
+//const uint16_t RADIO_SPEED = 250000;
+const uint16_t RADIO_SPEED = 2000000;
 
 Enrf24 radio(CE_PIN, CS_PIN, IRQ_PIN);  // P2.0=CE, P2.1=CSN, P2.2=IRQ
 BMP085<0> PSensor;
@@ -27,7 +28,7 @@ RealTimeClock rtc;
 
 uint8_t rxaddr[] = { 0xDE, 0xAD, 0xBE, 0xEF, 0x01 };
 const uint8_t txaddr[] = { 0xDE, 0xAD, 0xBE, 0xEF, 0x00 };
-unsigned int TIME_OUT = 30; //Timeout before enabling RX radio
+unsigned int TIME_OUT = 10; //Timeout before enabling RX radio
 unsigned int now, start;
 int sensorData[SENSOR_COUNT]; //Temp, Pres, Lux, Hum
 
@@ -94,6 +95,7 @@ void loop() {
   while (!radio.available(true))
     ;
   if (radio.read(inbuf)) { //If some data was received
+    delay(10);
     if (!strcmp(inbuf, STR_RQST_DATA)){ //If header is a DATA Request
        sensorsInit();
        digitalWrite(P1_0, LOW);

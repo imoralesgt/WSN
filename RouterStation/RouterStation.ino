@@ -18,7 +18,8 @@ RealTimeClock rtc;
 
 uint8_t txaddr[] = { 0xDE, 0xAD, 0xBE, 0xEF, 0x01 };
 const uint8_t rxaddr[] = { 0xDE, 0xAD, 0xBE, 0xEF, 0x00 };
-const uint16_t RADIO_SPEED = 250000;
+//const uint16_t RADIO_SPEED = 250000;
+const uint16_t RADIO_SPEED = 2000000;
 
 const char *str_on = "ON";
 const char *str_off = "OFF";
@@ -27,9 +28,9 @@ const char *STR_RQST_DATA = "DATA";
 const char *STR_SET_TIMEOUT = "TIMEOUT";
 
 const int DATA_LEN = 6;
-const int BUFFER_SIZE = 33;
+const int BUFFER_SIZE = 55;
 
-unsigned int TIME_OUT = 30;
+unsigned int TIME_OUT = 10;
 byte STATIONS_COUNT = 0;
 unsigned int sensorData[DATA_LEN];
 byte failed=0; //Failed attempts to get data in current sampling
@@ -47,12 +48,12 @@ void radioInit(void){
 
 void countRemoteStations(void){
   byte cnt;
-  /*
-  cnt  = digitalRead(STN_CNT_PINS[0])   +
-   digitalRead(STN_CNT_PINS[1])*2 +
-   digitalRead(STN_CNT_PINS[2])*4;
-   */
-  cnt = 1; //Just for debugging
+  
+  cnt  = (!digitalRead(STN_CNT_PINS[0]))   +
+         (!digitalRead(STN_CNT_PINS[1]))*2 +
+         (!digitalRead(STN_CNT_PINS[2]))*4;
+  
+  //cnt = 1; //Just for debugging
   STATIONS_COUNT = cnt;
 }
 
@@ -121,8 +122,7 @@ byte verifyHash(char *buffer){
   sum %= 256;
   if(sum==data[DATA_LEN-1]){
     return 1;
-  }
-  else{
+  }else{
     return 0;
   }
 }
@@ -214,9 +214,9 @@ byte RQSTandReadData(byte ID, char *inbuf){
 
   dataValid = 0;
 
-  while((retries < MAX_RETRIES) && (!dataValid)){
+  while((retries < MAX_RETRIES)){
     start = rtc.RTC_sec;
-    while(deltaSeconds(start,now) < RTY_TIMEOUT){
+    while((deltaSeconds(start,now) < RTY_TIMEOUT)){
       digitalWrite(RED_LED, HIGH);
       now = rtc.RTC_sec;
       sendRadioDataRequest(ID);
@@ -225,7 +225,7 @@ byte RQSTandReadData(byte ID, char *inbuf){
       if(radio.available(true)){
         dataValid = 1;
         break;
-      }
+      }  
     }
     retries++;
   }
@@ -237,6 +237,8 @@ byte RQSTandReadData(byte ID, char *inbuf){
     Serial.println(ID, DEC);
     failed++;
   }
+  
+  delay(100);
 
   if(radio.read(inbuf)) {
     dumpDataToSerial(inbuf);   
@@ -245,14 +247,12 @@ byte RQSTandReadData(byte ID, char *inbuf){
       splitBufferToData(inbuf,sensorData);
       //Serial.print("\n");
       return 1;
-    }
-    else{
+    }else{
       Serial.println("  Error de Hash");
       dataValid = 0;
       return 0;
     }    
   }
-
 }
 
 void loop() {

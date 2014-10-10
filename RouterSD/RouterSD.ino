@@ -38,7 +38,7 @@ void die(int pff_err){ //If anything goes wrong, this procedure will be triggere
 }
 
 void initSDcard(void){
-  FatFs.begin(CS_SD_PIN, 4); //DIV = 4 => SPI_CLK @ 4MHz
+  FatFs.begin(CS_SD_PIN, 16); //DIV = 4 => SPI_CLK @ 4MHz
 }
 
 void openSDfile(void){
