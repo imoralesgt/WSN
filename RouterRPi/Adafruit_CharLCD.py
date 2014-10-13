@@ -7,6 +7,7 @@
 #
 
 from time import sleep
+import time
 
 class Adafruit_CharLCD(object):
 
@@ -52,7 +53,7 @@ class Adafruit_CharLCD(object):
     LCD_5x10DOTS            = 0x04
     LCD_5x8DOTS             = 0x00
 
-    def __init__(self, pin_rs=25, pin_e=24, pins_db=[23, 17, 27, 22], GPIO=None):
+    def __init__(self, pin_rs=21, pin_e=26, pins_db=[19, 13, 6, 5], GPIO=None):
         # Emulate the old behavior of using RPi.GPIO if we haven't been given
         # an explicit GPIO interface to use
         if not GPIO:
@@ -209,7 +210,7 @@ if __name__ == '__main__':
         lcd.clear()
         data = time.ctime()
         s = data.split(' ')
-        a = s[3] + '\n' + s[2] + ' ' + s[1] + ' ' + s[4]
+        dateTime = s[3] + '\n' + s[2] + ' ' + s[1] + ' ' + s[4]
         #lcd.message("  Adafruit 16x2\n  Standard LCD")
-        lcd.message(a)
+        lcd.message(dateTime)
         sleep(1)
