@@ -29,30 +29,27 @@ import time
 
 
 class logger(object):
-	def __init__(self, fileName, rPI = True, url = ""):
-		self.fileName = fileName
+	def __init__(self, rPI = True, url = ""):
 		self.url = url
 		self.rPI = rPI
+		self.fileName = self.getFileName()
 
 		if rPI:
 			self.PORT = '/dev/ttyACM0'
-			self.initGPIO()
 			from Adafruit_CharLCD import Adafruit_CharLCD
 			self.lcd = Adafruit_CharLCD()
 		else:
 			self.PORT = 'COM54'
 
 		self.BAUDRATE = 115200
-		self.TIMEOUT = 5
+		self.TIMEOUT = 0
 		self.openSerial()
-
-	def initGPIO(self):
-		#import RPi.GPIO
-		pass
 
 	def openSerial(self):
 		try:
 			self.uart = serial.Serial(self.PORT, self.BAUDRATE, timeout = self.TIMEOUT)
+			self.uart.flushInput()
+			self.uart.flushOutput()
 			return 1
 		except:
 			print "Error al abrir puerto serial " + self.PORT
@@ -60,7 +57,7 @@ class logger(object):
 
 	def readSerial(self):
 		try:
-			self.uart.write('a')
+			#self.uart.write('a')
 			data = self.uart.readline()
 			return data
 		except:
@@ -76,7 +73,9 @@ class logger(object):
 			return None
 
 	def appendData(self, data):
-		pass
+		archivo = open(self.fileName, 'a')
+		archivo.write(data)
+		archivo.close()
 
 	def uploadData(self, data):
 		pass
@@ -92,16 +91,47 @@ class logger(object):
 		if self.rPI:
 			self.lcd.message(msg)
 
+	def translateDate(self, day, month, year):
+		MONTHS = ('Jan, Feb, Mar, Apr, Jun, Jul, Aug, Sep, Oct, Nov, Dec')
+		return str(year)+str(MONTHS.find(month)+1)+str(day)
+
+	def translateTime(self, time):
+		timeSplit = time.split(':')
+		time = timeSplit[0]+timeSplit[1]+timeSplit[2]
+		return time
+
+	def getCurrentDateTime(self):
+		dateTime = time.ctime()
+		s = dateTime.split(' ')
+		return s
+
+	def getCurrentTime(self):
+		return self.getCurrentDateTime()[3] #Return current time
+
+	def getCurrentDate(self):
+		dateTime = self.getCurrentDateTime()
+		dateTime = self.translateDate(dateTime[2], dateTime[1], dateTime[4])
+		return dateTime
+
+	def getFileName(self):
+		return = self.getCurrentDate() + '_' + self.getCurrentTime()		
 
 
-log = logger('a.txt', True)
+log = logger(True)
 try:
 	while True:
 		data = log.readSerial()
+		log.appendData(data)
 		print data,
 		log.lcdClear()
-		log.lcdMessage('T = ' + str(data).strip('\r\n'))
-		time.sleep(1)
+		log.lcdMessage('T = ' + str(data).strip('\r\n\t').strip())
+		#time.sleep(1)
 except KeyboardInterrupt:
 	log.closeSerial()
 	print "Adios!"
+
+
+'''
+To set date:
+date -s "2 OCT 2006 18:00:00"
+'''
