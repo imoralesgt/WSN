@@ -27,6 +27,42 @@ to exosite (http://exosite.com) so WSN may be plotted and read in real-time
 import serial
 import time
 
+class GUI(object):
+	def __init__(self, rPI = True):
+		self.rPI = rPI
+		self.PUSH_BUTTONS = (17, 27, 22, 23)
+		self.RDY = 24
+		if self.rPI:
+			import RPi.GPIO as GPIO
+			from Adafruit_CharLCD import Adafruit_CharLCD
+			self.GPIO = GPIO
+			self.lcd = Adafruit_CharLCD()
+			GPIO.setwarnings(False)
+			GPIO.setmode(GPIO.BCM)
+			GPIO.setup(self.RDY, GPIO.OUT)
+			self.setRDYstate(1)
+			for i in self.PUSH_BUTTONS:
+				GPIO.setup(i, GPIO.IN)
+
+
+	def readPushButtons(self):
+		state = []
+		for i in self.PUSH_BUTTONS:
+			state.append(self.GPIO.input(i))
+		return state
+
+	def setRDYstate(self, state):
+		self.GPIO.output(self.RDY, state)
+
+	def lcdClear(self):
+		if self.rPI:
+			self.lcd.clear()
+
+	def lcdMessage(self, msg):
+		if self.rPI:
+			self.lcd.message(msg)
+
+
 
 class logger(object):
 	def __init__(self, rPI = True, url = ""):
@@ -36,14 +72,15 @@ class logger(object):
 
 		if rPI:
 			self.PORT = '/dev/ttyACM0'
-			from Adafruit_CharLCD import Adafruit_CharLCD
-			self.lcd = Adafruit_CharLCD()
+			
 		else:
 			self.PORT = 'COM54'
 
 		self.BAUDRATE = 115200
 		self.TIMEOUT = 0
 		self.openSerial()
+
+		self.gui = GUI(self.rPI)
 
 	def openSerial(self):
 		try:
@@ -83,14 +120,6 @@ class logger(object):
 	def getRPi(self):
 		return self.rPI
 
-	def lcdClear(self):
-		if self.rPI:
-			self.lcd.clear()
-
-	def lcdMessage(self, msg):
-		if self.rPI:
-			self.lcd.message(msg)
-
 	def translateDate(self, day, month, year):
 		MONTHS = ('Jan, Feb, Mar, Apr, Jun, Jul, Aug, Sep, Oct, Nov, Dec')
 		return str(year)+str(MONTHS.find(month)+1)+str(day)
@@ -114,7 +143,7 @@ class logger(object):
 		return dateTime
 
 	def getFileName(self):
-		return = self.getCurrentDate() + '_' + self.getCurrentTime()		
+		return self.getCurrentDate() + '_' + self.getCurrentTime() + '.csv'		
 
 
 log = logger(True)
@@ -123,8 +152,8 @@ try:
 		data = log.readSerial()
 		log.appendData(data)
 		print data,
-		log.lcdClear()
-		log.lcdMessage('T = ' + str(data).strip('\r\n\t').strip())
+		log.gui.lcdClear()
+		log.gui.lcdMessage('T = ' + str(data).strip('\t').strip('\r\n'))
 		#time.sleep(1)
 except KeyboardInterrupt:
 	log.closeSerial()
