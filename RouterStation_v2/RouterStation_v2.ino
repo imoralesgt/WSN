@@ -10,16 +10,15 @@
 const byte IRQ_PIN         = P2_2; //NRF24L01+ IRQ Pin
 const byte CE_PIN          = P2_0; //NRF24L01+ CE Pin
 const byte CS_PIN          = P2_1; //NRF24L01+ CS Pin
+const byte RDY_PIN         = P1_4; //SD Card CS Pin
 const byte STN_CNT_PINS[3] = {P2_3, P2_4, P2_5}; //Station Count PINs
-const byte ENABLE_RADIO_PIN = P1_4; //Enable radio until SD Card is up and working
 
 Enrf24 radio(CE_PIN, CS_PIN, IRQ_PIN);
 RealTimeClock rtc;
 
 uint8_t txaddr[] = { 0xDE, 0xAD, 0xBE, 0xEF, 0x01 };
 const uint8_t rxaddr[] = { 0xDE, 0xAD, 0xBE, 0xEF, 0x00 };
-//const uint16_t RADIO_SPEED = 250000;
-const uint16_t RADIO_SPEED = 2000000;
+const uint16_t RADIO_SPEED = 1000000;
 
 const char *str_on = "ON";
 const char *str_off = "OFF";
@@ -28,9 +27,9 @@ const char *STR_RQST_DATA = "DATA";
 const char *STR_SET_TIMEOUT = "TIMEOUT";
 
 const int DATA_LEN = 6;
-const int BUFFER_SIZE = 55;
+const int BUFFER_SIZE = 33;
 
-unsigned int TIME_OUT = 10;
+unsigned int TIME_OUT = 15;
 byte STATIONS_COUNT = 0;
 unsigned int sensorData[DATA_LEN];
 byte failed=0; //Failed attempts to get data in current sampling
@@ -57,35 +56,38 @@ void countRemoteStations(void){
   STATIONS_COUNT = cnt;
 }
 
+void reset(){
+  WDTCTL = 0xFFFF; //Access violation to WDT causes software reset
+}
+
 void setup() {
+  
   int j;
 
-  pinMode(RED_LED, OUTPUT);
-  pinMode(PUSH2, INPUT_PULLUP);
-  
-  pinMode(ENABLE_RADIO_PIN, INPUT_PULLUP);
+  pinMode(RDY_PIN, INPUT_PULLUP);
+  while(digitalRead(RDY_PIN)){;} //Wait until RPi has finished booting
 
-  //Disable SD Card operations during TEST MODE
+  pinMode(RED_LED, OUTPUT);
+  digitalWrite(RED_LED, 0);
+  pinMode(PUSH2, INPUT_PULLUP);
+
+  
 
 
   for(j = 0; j < 3; j++){
     pinMode(STN_CNT_PINS[j], INPUT_PULLUP);
   }
 
-
-
-  Serial.begin(115200);
+  Serial.begin(9600);
   countRemoteStations(); //set value on STATIONS_COUNT variable
-
-  delay(1000);
-
-  while(digitalRead(ENABLE_RADIO_PIN)){
-    ; //Wait until SD uC is ready
-  }
+  
+  delay(100); //Initial setup delay
+  
+  digitalWrite(RED_LED, 1);
 
   radioInit();
 
-  rtc.Set_Time(23,42,0);
+  rtc.Set_Time(21,15,0);
   rtc.Set_Date(2014,8,30);
   rtc.begin();
 }
@@ -110,57 +112,11 @@ void splitBufferToData(char *buffer, unsigned int *data){
   }
 }
 
-byte verifyHash(char *buffer){
-  unsigned int data[DATA_LEN];
-  splitBufferToData(buffer, data);
-
-  int i;
-  long sum = 0;
-  for(i = 0; i < DATA_LEN-1; i++){
-    sum += data[i];
-  }
-  sum %= 256;
-  if(sum==data[DATA_LEN-1]){
-    return 1;
-  }else{
-    return 0;
-  }
-}
-
-void dumpTimeToSerial(void){
-  byte Day = rtc.RTC_day;
-  byte Month = rtc.RTC_month;
-  uint16_t Year = rtc.RTC_year;
-  byte hrs  = rtc.RTC_hr;
-  byte mins = rtc.RTC_min;
-  byte secs = rtc.RTC_sec;
-  if (Day < 10)
-    Serial.print("0");
-  Serial.print(Day, DEC);
-  Serial.print("/");
-  if (Month < 10)
-    Serial.print("0");
-  Serial.print(Month, DEC);
-  Serial.print("/");
-  Serial.print(Year);
-  Serial.print(",");
-  if (hrs < 10)
-    Serial.print("0");
-  Serial.print(hrs, DEC);
-  Serial.print(":");
-  if (mins < 10)
-    Serial.print("0");
-  Serial.print(mins, DEC);
-  Serial.print(":");
-  if (secs < 10)
-    Serial.print("0");
-  Serial.print(secs, DEC);
-  Serial.print(",");
-}
 
 void dumpDataToSerial(char *data){
   //dumpTimeToSerial();
-  Serial.println(data);
+  Serial.print(data);
+  Serial.print("\n");
 }
 
 void sendRadioDataRequest(byte destAddr){
@@ -206,6 +162,18 @@ void dco16MHz(){
   DCOCTL = CALDCO_16MHZ;  
 }
 
+void wdtSet(){
+  //WDTCTL = WDTPW + WDTHOLD + WDTCNTCL; //Clear WDT+ Cnt
+  //WDTCTL = WDTPW + WDTCNTCL + WDTSSEL; //WDT 32kHz source 1000ms
+  WDTCTL = 0x5A0C;
+}
+
+void wdtReset(){
+  //WDTCTL = 0x5A88;
+  WDTCTL = WDTPW | WDTHOLD;
+  //WDTCTL = WDTPW + WDTHOLD;
+}
+
 byte RQSTandReadData(byte ID, char *inbuf){
   int now, start, retries, dataValid;
   now = rtc.RTC_sec;
@@ -214,55 +182,57 @@ byte RQSTandReadData(byte ID, char *inbuf){
 
   dataValid = 0;
 
-  while((retries < MAX_RETRIES)){
+  while((retries < MAX_RETRIES) && (!dataValid)){
     start = rtc.RTC_sec;
-    while((deltaSeconds(start,now) < RTY_TIMEOUT)){
+    while(deltaSeconds(start,now) < RTY_TIMEOUT){
       digitalWrite(RED_LED, HIGH);
       now = rtc.RTC_sec;
       sendRadioDataRequest(ID);
+      
       setRadioRxMode();
       digitalWrite(RED_LED, LOW);
       if(radio.available(true)){
         dataValid = 1;
         break;
-      }  
+      }
     }
     retries++;
   }
   digitalWrite(RED_LED, LOW);
 
   if(!dataValid){
-    dumpTimeToSerial();
+    //dumpTimeToSerial();
     Serial.print("SIN RESPUESTA DE ESTACION #");
     Serial.println(ID, DEC);
     failed++;
   }
-  
-  delay(100);
 
   if(radio.read(inbuf)) {
-    dumpDataToSerial(inbuf);   
+    dumpDataToSerial(inbuf);
+    dataValid = 1;
+    /*
     if(verifyHash(inbuf)){
       dataValid = 1;
       splitBufferToData(inbuf,sensorData);
       //Serial.print("\n");
       return 1;
-    }else{
+    }
+    else{
       Serial.println("  Error de Hash");
       dataValid = 0;
       return 0;
     }    
+    */
   }
+  
+  
+
 }
 
 void loop() {
   char inbuf[BUFFER_SIZE];
 
   byte stn;
-  
-  while(digitalRead(ENABLE_RADIO_PIN)){
-    ; //Wait until neighbor uC enables this one
-  }
 
   failed = 0; //Remove deadtime if failure in reading sensor happens
   //This is to improve nodes' battery life
@@ -298,6 +268,7 @@ void loop() {
     now = timeMinutes();
     __bis_status_register(LPM1_bits);
   }
+  reset();
 
   /*
   if(!digitalRead(PUSH2)){
@@ -344,4 +315,3 @@ void dump_radio_status_to_serialport(uint8_t status){
  }
  }
  */
-

@@ -7,7 +7,6 @@
 #include <dht11.h>     //Humidity sensor
 #include <RTCplus.h>   //Real time clock
 
-
 #define SENSOR_COUNT 4
 
 const byte IRQ_PIN      = P2_2; //NRF24L01+ IRQ Pin
@@ -18,7 +17,7 @@ const byte LED1         = P1_0; //RED LED Pin
 const byte ADDR_PINS[3] = {P2_3, P2_4, P2_5};
 
 //const uint16_t RADIO_SPEED = 250000;
-const uint16_t RADIO_SPEED = 2000000;
+const uint16_t RADIO_SPEED = 1000000;
 
 Enrf24 radio(CE_PIN, CS_PIN, IRQ_PIN);  // P2.0=CE, P2.1=CSN, P2.2=IRQ
 BMP085<0> PSensor;
@@ -30,7 +29,7 @@ uint8_t rxaddr[] = { 0xDE, 0xAD, 0xBE, 0xEF, 0x01 };
 const uint8_t txaddr[] = { 0xDE, 0xAD, 0xBE, 0xEF, 0x00 };
 unsigned int TIME_OUT = 10; //Timeout before enabling RX radio
 unsigned int now, start;
-int sensorData[SENSOR_COUNT]; //Temp, Pres, Lux, Hum
+int32_t sensorData[SENSOR_COUNT]; //Temp, Pres, Lux, Hum
 
 
 const char *str_on = "ON";
@@ -102,10 +101,11 @@ void loop() {
             
        humSensor.read(HUM_PIN);
        
-       int hum = humSensor.humidity;
-       int temp = humSensor.temperature*10;
-       temp += PSensor.temperature;
-       temp /= 2;
+       uint16_t hum = humSensor.humidity;
+       //int temp = humSensor.temperature*10;
+       int16_t temp = PSensor.temperature;
+       //temp += PSensor.temperature;
+       //temp /= 2;
        //int hum = humSensor.temperature;
        
        uint16_t lux = lightMeter.readLightLevel();
@@ -123,28 +123,30 @@ void loop() {
        
        /*
        Radio data will be sent as:
-       MY_ID;TEMP;PRESS;LUX;HUM;HASH
+       MY_ID,TEMP,PRESS,LUX,HUM,HASH
        
        MY_ID <= UNIQUE NODE ID
        TEMP  <= TEMPERATURE*10 (FIXED POINT)
        PRESS <= ATM. PRESSURE (hPa)
        LUX   <= LIGHT METER MEASUREMENT
        HUM   <= RELATIVE HUMIDITY
-       HASH  <= SUM OF PREVIOUS DATA MOD 256
        */
        
        long sum = rxaddr[4];
        int i;
        radio.print(rxaddr[4]); //Send my Address
        radio.print(",");
-       for (i = 0; i < SENSOR_COUNT; i++){ //Send sensor data
-         sum += sensorData[i];
+       //radio.print(sensorData[0]/10); //Send temperature
+       //radio.print(".");
+       //radio.print(sensorData[0]%10); //Send one-digit decimal temperature
+       for (i = 0; i < SENSOR_COUNT; i++){ //Send sensor data, excepting temperature
+         //sum += sensorData[i];
          radio.print(sensorData[i]);
-         radio.print(","); //Semicolon-separated values
+         radio.print(","); //Comma-separated values
        }
-       byte hash = (sum%256); //Simple hash used as checksum
-       radio.print(hash);
-       radio.print(",");
+       //byte hash = (sum%256); //Simple hash used as checksum
+       //radio.print(hash);
+       //radio.print(",");
        radio.flush(); //Send the data that has been put in the radio's output buffer
        digitalWrite(P1_0, LOW); //Data sent, turn LED OFF.       
     }
@@ -173,12 +175,12 @@ byte validateTimeOut(){ //Has already passed enough time to wake up?
 
 void setLocalAddress(void){
   byte addr;
-  /*
-  addr = digitalRead(ADDR_PINS[0])   +
-         digitalRead(ADDR_PINS[1])*2 +
-         digitalRead(ADDR_PINS[2])*4;
-  */
-  addr = 1; //Just for debugging 
+         
+  addr = (!digitalRead(ADDR_PINS[0]))   +
+         (!digitalRead(ADDR_PINS[1]))*2 +
+         (!digitalRead(ADDR_PINS[2]))*4;
+  
+  //addr = 1; //Just for debugging 
   rxaddr[4] = addr;
 }
 
