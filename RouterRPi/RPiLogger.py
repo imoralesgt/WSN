@@ -21,8 +21,9 @@ User will be prompted to enter current date/time only once, everytime
 the OS boots.
 
 Some functionality will be also implemented in order to send sensors' data
-to exosite (http://exosite.com) so WSN may be plotted and read in real-time
-from anywhere around the world.
+to exosite (http://www.exosite.com) so readings coming from WSN may be plotted
+and seen in real-time from anywhere around the world through fancy good-looking
+gauges and displays.
 """
 
 import serial
@@ -50,7 +51,6 @@ class GUI(object):
 			for i in self.PUSH_BUTTONS:
 				GPIO.setup(i, GPIO.IN)
 
-
 	def readPushButtons(self):
 		state = []
 		for i in self.PUSH_BUTTONS:
@@ -77,7 +77,6 @@ class GUI(object):
 			self.lcd.message(msg)
 
 
-
 class logger(object):
 
 	RF_TIMEOUT = 15 #Timeout seconds between MSP430 uC
@@ -95,7 +94,7 @@ class logger(object):
 			self.PORT = 'COM54'
 
 		self.BAUDRATE = 9600
-		self.TIMEOUT = self.RF_TIMEOUT + 15
+		self.TIMEOUT = self.RF_TIMEOUT + 10
 		self.openSerial()
 
 		self.gui = GUI(self.rPI)
@@ -166,6 +165,11 @@ class logger(object):
 			archivo.close()
 
 	def uploadData(self, data):
+		'''
+		Here is where data will be uploaded
+		to Exosite. Coding a new class to do this
+		isn't a bad idea.
+		'''
 		pass
 
 	def getRPi(self):

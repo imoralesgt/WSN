@@ -84,73 +84,106 @@ void setup() {
 }
 
 void loop() {
+  unsigned int tOut;
   char inbuf[33];
   
   dco16MHz();
   
   radioInit();
   enableRx(); //Start listening
-   
+
   while (!radio.available(true))
-    ;
+    ;  
   if (radio.read(inbuf)) { //If some data was received
     delay(10);
-    if (!strcmp(inbuf, STR_RQST_DATA)){ //If header is a DATA Request
-       sensorsInit();
-       digitalWrite(P1_0, LOW);
-            
-       humSensor.read(HUM_PIN);
-       
-       uint16_t hum = humSensor.humidity;
-       //int temp = humSensor.temperature*10;
-       int16_t temp = PSensor.temperature;
-       //temp += PSensor.temperature;
-       //temp /= 2;
-       //int hum = humSensor.temperature;
-       
-       uint16_t lux = lightMeter.readLightLevel();
-       
-       radioInit(); //Init radio as Tx
-       radio.setTXaddress((void*)txaddr);
-
-       //Temp, Pres, Lux, Hum       
-       //sensorData[0] = PSensor.temperature;       //Celsius
-       sensorData[0] = temp;       //Celsius
-       sensorData[1] = (PSensor.pressure+50)/100; //hPa
-       sensorData[2] = lux;                       //Luxes
-       sensorData[3] = hum;                       //%HR
-
-       
-       /*
-       Radio data will be sent as:
-       MY_ID,TEMP,PRESS,LUX,HUM,HASH
-       
-       MY_ID <= UNIQUE NODE ID
-       TEMP  <= TEMPERATURE*10 (FIXED POINT)
-       PRESS <= ATM. PRESSURE (hPa)
-       LUX   <= LIGHT METER MEASUREMENT
-       HUM   <= RELATIVE HUMIDITY
-       */
-       
-       long sum = rxaddr[4];
-       int i;
-       radio.print(rxaddr[4]); //Send my Address
-       radio.print(",");
-       //radio.print(sensorData[0]/10); //Send temperature
-       //radio.print(".");
-       //radio.print(sensorData[0]%10); //Send one-digit decimal temperature
-       for (i = 0; i < SENSOR_COUNT; i++){ //Send sensor data, excepting temperature
-         //sum += sensorData[i];
-         radio.print(sensorData[i]);
-         radio.print(","); //Comma-separated values
-       }
-       //byte hash = (sum%256); //Simple hash used as checksum
-       //radio.print(hash);
-       //radio.print(",");
-       radio.flush(); //Send the data that has been put in the radio's output buffer
-       digitalWrite(P1_0, LOW); //Data sent, turn LED OFF.       
+    tOut = splitBufferToTimeOut(inbuf);
+    Serial.println(tOut);
+    if (tOut > 0){ 
+      TIME_OUT = tOut;
+    //if (!strcmp(inbuf, STR_RQST_DATA)){
+      //delay(10);
+      //Serial.println(inbuf);
+      //if (!strcmp(inbuf, STR_RQST_DATA)){ //If header is a DATA Request
+         sensorsInit();
+         digitalWrite(P1_0, LOW);
+              
+         humSensor.read(HUM_PIN);
+         
+         uint16_t hum = humSensor.humidity;
+         //int temp = humSensor.temperature*10;
+         int16_t temp = PSensor.temperature;
+         //temp += PSensor.temperature;
+         //temp /= 2;
+         //int hum = humSensor.temperature;
+         
+         uint16_t lux = lightMeter.readLightLevel();
+         
+         radioInit(); //Init radio as Tx
+         radio.setTXaddress((void*)txaddr);
+  
+         //Temp, Pres, Lux, Hum       
+         //sensorData[0] = PSensor.temperature;       //Celsius
+         sensorData[0] = temp;       //Celsius
+         sensorData[1] = (PSensor.pressure+50)/100; //hPa
+         sensorData[2] = lux;                       //Luxes
+         sensorData[3] = hum;                       //%HR
+  
+         
+         /*
+         Radio data will be sent as:
+         MY_ID,TEMP,PRESS,LUX,HUM,HASH
+         
+         MY_ID <= UNIQUE NODE ID
+         TEMP  <= TEMPERATURE*10 (FIXED POINT)
+         PRESS <= ATM. PRESSURE (hPa)
+         LUX   <= LIGHT METER MEASUREMENT
+         HUM   <= RELATIVE HUMIDITY
+         */
+         
+         //long sum = rxaddr[4];
+         int i;
+         radio.print(rxaddr[4]); //Send my Address
+         radio.print(",");
+         //radio.print(sensorData[0]/10); //Send temperature
+         //radio.print(".");
+         //radio.print(sensorData[0]%10); //Send one-digit decimal temperature
+         for (i = 0; i < SENSOR_COUNT; i++){ //Send sensor data, excepting temperature
+           //sum += sensorData[i];
+           radio.print(sensorData[i]);
+           radio.print(","); //Comma-separated values
+         }
+         //byte hash = (sum%256); //Simple hash used as checksum
+         //radio.print(hash);
+         //radio.print(",");
+         radio.flush(); //Send the data that has been put in the radio's output buffer
+         digitalWrite(P1_0, LOW); //Data sent, turn LED OFF.
+     /*           
+      //}else if(!strcmp(inbuf, STR_SET_TIMEOUT)){
+      //}else{
+        //radioInit(); //Init radio as Tx
+        //radio.setTXaddress((void*)txaddr);
+  
+        //radioInit();
+        //enableRx(); //Start listening
+        while(strcmp(STR_SET_TIMEOUT, inbuf)){
+          radio.read(inbuf); 
+        }
+        digitalWrite(P1_0, LOW);
+        //while (!radio.available(true));
+        if (radio.read(inbuf)){
+          Serial.println(inbuf);
+          TIME_OUT = atoi(inbuf);
+          Serial.println(TIME_OUT, DEC);
+          //radioInit(); //Init radio as Tx
+          //radio.setTXaddress((void*)txaddr);
+          //radio.print("OK");
+          //radio.flush();
+        }
+      //} */
     }
   }
+  
+  
   
   now = timeMinutes();
   start = now;
@@ -229,33 +262,23 @@ void sensorsInit(){
   PSensor.calculate();
 }
 
-/*
-void dump_radio_status_to_serialport(uint8_t status)
-{
-  Serial.print("Enrf24 radio transceiver status: ");
-  switch (status) {
-    case ENRF24_STATE_NOTPRESENT:
-      Serial.println("NO TRANSCEIVER PRESENT");
-      break;
-
-    case ENRF24_STATE_DEEPSLEEP:
-      Serial.println("DEEP SLEEP <1uA power consumption");
-      break;
-
-    case ENRF24_STATE_IDLE:
-      Serial.println("IDLE module powered up w/ oscillators running");
-      break;
-
-    case ENRF24_STATE_PTX:
-      Serial.println("Actively Transmitting");
-      break;
-
-    case ENRF24_STATE_PRX:
-      Serial.println("Receive Mode");
-      break;
-
-    default:
-      Serial.println("UNKNOWN STATUS CODE");
+unsigned int splitBufferToTimeOut(char *buffer){
+  char data[5][33];
+  int i = 0;
+  char *token;
+  char *search = ",";
+  token = strtok(buffer, search);
+  while(token != NULL){
+    strcpy(data[i], token);
+    Serial.println(data[i]);
+    //data[i] = atoi(token);
+    token = strtok(NULL, search);
+    i++;
   }
+  if(!strcmp(data[0], STR_RQST_DATA)){
+    return atoi(data[1]);
+  }else{
+    return 0;
+  }  
 }
-*/
+

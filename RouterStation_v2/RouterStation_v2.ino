@@ -11,13 +11,16 @@ const byte IRQ_PIN         = P2_2; //NRF24L01+ IRQ Pin
 const byte CE_PIN          = P2_0; //NRF24L01+ CE Pin
 const byte CS_PIN          = P2_1; //NRF24L01+ CS Pin
 const byte RDY_PIN         = P1_4; //SD Card CS Pin
-const byte STN_CNT_PINS[3] = {P2_3, P2_4, P2_5}; //Station Count PINs
+const byte STN_CNT_PINS[3] = {
+  P2_3, P2_4, P2_5}; //Station Count PINs
 
 Enrf24 radio(CE_PIN, CS_PIN, IRQ_PIN);
 RealTimeClock rtc;
 
-uint8_t txaddr[] = { 0xDE, 0xAD, 0xBE, 0xEF, 0x01 };
-const uint8_t rxaddr[] = { 0xDE, 0xAD, 0xBE, 0xEF, 0x00 };
+uint8_t txaddr[] = { 
+  0xDE, 0xAD, 0xBE, 0xEF, 0x01 };
+const uint8_t rxaddr[] = { 
+  0xDE, 0xAD, 0xBE, 0xEF, 0x00 };
 const uint16_t RADIO_SPEED = 1000000;
 
 const char *str_on = "ON";
@@ -28,6 +31,8 @@ const char *STR_SET_TIMEOUT = "TIMEOUT";
 
 const int DATA_LEN = 6;
 const int BUFFER_SIZE = 33;
+
+char inbuf[BUFFER_SIZE];
 
 unsigned int TIME_OUT = 15;
 byte STATIONS_COUNT = 0;
@@ -47,11 +52,11 @@ void radioInit(void){
 
 void countRemoteStations(void){
   byte cnt;
-  
+
   cnt  = (!digitalRead(STN_CNT_PINS[0]))   +
-         (!digitalRead(STN_CNT_PINS[1]))*2 +
-         (!digitalRead(STN_CNT_PINS[2]))*4;
-  
+    (!digitalRead(STN_CNT_PINS[1]))*2 +
+    (!digitalRead(STN_CNT_PINS[2]))*4;
+
   //cnt = 1; //Just for debugging
   STATIONS_COUNT = cnt;
 }
@@ -61,18 +66,17 @@ void reset(){
 }
 
 void setup() {
-  
+
   int j;
 
   pinMode(RDY_PIN, INPUT_PULLUP);
-  while(digitalRead(RDY_PIN)){;} //Wait until RPi has finished booting
+  while(digitalRead(RDY_PIN)){
+    ;
+  } //Wait until RPi has finished booting
 
   pinMode(RED_LED, OUTPUT);
   digitalWrite(RED_LED, 0);
   pinMode(PUSH2, INPUT_PULLUP);
-
-  
-
 
   for(j = 0; j < 3; j++){
     pinMode(STN_CNT_PINS[j], INPUT_PULLUP);
@@ -80,9 +84,9 @@ void setup() {
 
   Serial.begin(9600);
   countRemoteStations(); //set value on STATIONS_COUNT variable
-  
+
   delay(100); //Initial setup delay
-  
+
   digitalWrite(RED_LED, 1);
 
   radioInit();
@@ -90,6 +94,12 @@ void setup() {
   rtc.Set_Time(21,15,0);
   rtc.Set_Date(2014,8,30);
   rtc.begin();
+  /*
+  byte i;
+   for(i = 1; i <= STATIONS_COUNT; i++){
+   rqstAndSendTimeOut(i, inbuf);    
+   }
+   */
 }
 
 
@@ -120,10 +130,23 @@ void dumpDataToSerial(char *data){
 }
 
 void sendRadioDataRequest(byte destAddr){
+  char tmpStr[33];
+  char tmpTout[5];
+  itoa(TIME_OUT, tmpTout, 10);
   txaddr[4] = destAddr;
   radio.setTXaddress(txaddr);
-  radio.print(STR_RQST_DATA);
+  strcpy(tmpStr, STR_RQST_DATA);
+  strcat(tmpStr, ",");
+  strcat(tmpStr, tmpTout);
+  radio.print(tmpStr);
   radio.flush(); 
+}
+
+void sendTimeOutRequest(byte destAddr){
+  txaddr[4] = destAddr;
+  radio.setTXaddress(txaddr);
+  radio.print(STR_SET_TIMEOUT);
+  radio.flush();
 }
 
 void setRadioRxMode(void){
@@ -188,7 +211,7 @@ byte RQSTandReadData(byte ID, char *inbuf){
       digitalWrite(RED_LED, HIGH);
       now = rtc.RTC_sec;
       sendRadioDataRequest(ID);
-      
+
       setRadioRxMode();
       digitalWrite(RED_LED, LOW);
       if(radio.available(true)){
@@ -212,25 +235,62 @@ byte RQSTandReadData(byte ID, char *inbuf){
     dataValid = 1;
     /*
     if(verifyHash(inbuf)){
-      dataValid = 1;
-      splitBufferToData(inbuf,sensorData);
-      //Serial.print("\n");
-      return 1;
-    }
-    else{
-      Serial.println("  Error de Hash");
-      dataValid = 0;
-      return 0;
-    }    
-    */
+     dataValid = 1;
+     splitBufferToData(inbuf,sensorData);
+     //Serial.print("\n");
+     return 1;
+     }
+     else{
+     Serial.println("  Error de Hash");
+     dataValid = 0;
+     return 0;
+     }    
+     */
   }
-  
-  
+
+}
+
+
+void rqstAndSendTimeOut(byte ID, char *inbuf){
+  int now, start, retries, dataValid;
+  now = rtc.RTC_sec;
+  start = now;
+  retries = 0;
+
+  dataValid = 0;
+
+  while((retries < MAX_RETRIES) && (!dataValid)){
+    start = rtc.RTC_sec;
+    while(deltaSeconds(start,now) < RTY_TIMEOUT){
+      digitalWrite(RED_LED, HIGH);
+      now = rtc.RTC_sec;
+      sendTimeOutRequest(ID);
+
+      setRadioRxMode();
+      digitalWrite(RED_LED, LOW);
+      if(radio.available(true)){
+        dataValid = 1;
+        break;
+      }
+    }
+    retries++;
+  }
+  digitalWrite(RED_LED, LOW);
+
+  if(!dataValid){
+    Serial.print("SIN RESPUESTA DE ESTACION #");
+    Serial.println(ID, DEC);
+    failed++;
+  }
+
+  if(radio.read(inbuf)) {
+    //dumpDataToSerial(inbuf);
+    dataValid = 1;
+  }
 
 }
 
 void loop() {
-  char inbuf[BUFFER_SIZE];
 
   byte stn;
 
@@ -315,3 +375,4 @@ void dump_radio_status_to_serialport(uint8_t status){
  }
  }
  */
+
