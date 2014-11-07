@@ -34,7 +34,7 @@ const int BUFFER_SIZE = 33;
 
 char inbuf[BUFFER_SIZE];
 
-unsigned int TIME_OUT = 15;
+unsigned int TIME_OUT = 30;
 byte STATIONS_COUNT = 0;
 unsigned int sensorData[DATA_LEN];
 byte failed=0; //Failed attempts to get data in current sampling
@@ -297,6 +297,7 @@ void loop() {
   failed = 0; //Remove deadtime if failure in reading sensor happens
   //This is to improve nodes' battery life
   for(stn = 1; stn <= STATIONS_COUNT; stn++){
+    delay(50);
     if(RQSTandReadData(stn, inbuf)){
       //digitalWrite(CS_SD_PIN, LOW);
 

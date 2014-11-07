@@ -43,7 +43,11 @@ class GUI(object):
 			GPIO.setwarnings(False)
 			GPIO.setmode(GPIO.BCM)
 			GPIO.setup(self.RDY, GPIO.OUT)
+
 			self.setRDYstate(1)
+
+			self.showIntro()
+
 			self.setRDYstate(0)			
 
 			GPIO.setup(self.RST, GPIO.OUT)
@@ -51,10 +55,13 @@ class GUI(object):
 			for i in self.PUSH_BUTTONS:
 				GPIO.setup(i, GPIO.IN)
 
-	def readPushButtons(self):
+	def readPushButtons(self): #Wire pull-down resistors to each Push-Button
 		state = []
 		for i in self.PUSH_BUTTONS:
 			state.append(self.GPIO.input(i))
+		time.sleep(0.150) #Debouncing delay
+		for i in range(len(self.PUSH_BUTTONS)):
+			state[i] = self.GPIO.input(self.PUSH_BUTTONS[i]) and state[i]
 		return state
 
 	def setRDYstate(self, state):
@@ -76,10 +83,16 @@ class GUI(object):
 		if self.rPI:
 			self.lcd.message(msg)
 
+	def showIntro(self):
+		msg = 'WSN Arquitectura' + '\n' + 'Inicializando...'
+		self.lcdClear()
+		self.lcdMessage(msg)
+		time.sleep(4)
+
 
 class logger(object):
 
-	RF_TIMEOUT = 15 #Timeout seconds between MSP430 uC
+	RF_TIMEOUT = 30 #Timeout seconds between MSP430 uC
 
 	def __init__(self, rPI = True, url = ""):
 		self.url = url
@@ -98,6 +111,8 @@ class logger(object):
 		self.openSerial()
 
 		self.gui = GUI(self.rPI)
+
+		self.sendTimeOut()
 
 	def openSerial(self):
 		try:
@@ -126,6 +141,9 @@ class logger(object):
 			print "Error al cerrar puerto serial " + self.PORT
 			return None
 
+	def sendTimeOut(self):
+		self.uart.write('T' + str(RF_TIMEOUT) + ';')
+
 	def cleanSerialData(self, data):
 		ALLOWED_CHARACTERS = [32, 35, 44]
 		ALLOWED_CHARACTERS.extend(range(48,58))
@@ -138,6 +156,7 @@ class logger(object):
 			if ord(i) in ALLOWED_CHARACTERS:
 				newData += i
 		return newData
+
 
 	def fixTemperatureFormat(self, data):
 		splitData = data.split(',')
@@ -157,7 +176,7 @@ class logger(object):
 	def appendData(self, data):
 		try:
 			archivo = open(self.fileName, 'a')
-			dateTime = self.getCurrentDate() + ',' + self.getCurrentTime()
+			dateTime = self.getCurrentDate() + ',' + self.getCurrentDateTime()[3]
 			data = dateTime + ',' + data
 			archivo.write(data)
 			archivo.close()
@@ -176,8 +195,8 @@ class logger(object):
 		return self.rPI
 
 	def translateDate(self, day, month, year):
-		MONTHS = ('Jan, Feb, Mar, Apr, Jun, Jul, Aug, Sep, Oct, Nov, Dec')
-		return str(year)+str(MONTHS.find(month)+1)+str(day)
+		MONTHS = ('Jan', 'Feb', 'Mar', 'Apr', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec')
+		return str(year)+str(MONTHS.index(month)+2)+str(day)
 
 	def translateTime(self, time):
 		timeSplit = time.split(':')
@@ -187,7 +206,11 @@ class logger(object):
 	def getCurrentDateTime(self):
 		dateTime = time.ctime()
 		s = dateTime.split(' ')
-		return s
+		c = []
+		for i in s:
+			if len(i):
+				c.append(i)
+		return c
 
 	def getCurrentTime(self):
 		return self.translateTime(self.getCurrentDateTime()[3]) #Return current time
@@ -217,8 +240,11 @@ try:
 		else:
 			log.gui.sendRST()
 			print "WDT RESET!"
-			time.sleep(0.95)
+			now = log.getCurrentTime()
+			while(log.getCurrentTime() != now):
+				pass
 		#time.sleep(1)
+#except KeyboardInterrupt or TypeError or AttributeError:
 except KeyboardInterrupt:
 	log.gui.setRDYstate(1)
 	log.closeSerial()
@@ -226,6 +252,6 @@ except KeyboardInterrupt:
 
 
 '''
-To set date:
-sudo date -s "16 OCT 2014 10:01:00"
+To set date + time:
+sudo date -s "07 NOV 2014 11:30:00"
 '''
