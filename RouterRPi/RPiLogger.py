@@ -141,6 +141,9 @@ class logger(object):
 			print "Error al cerrar puerto serial " + self.PORT
 			return None
 
+
+#------------------SEND TIMEOUT VIA UART TO ROUTERSTATION MSP430
+
 	def sendTimeOut(self):
 		self.uart.write('T' + str(RF_TIMEOUT) + ';')
 
