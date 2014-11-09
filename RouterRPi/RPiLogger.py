@@ -28,6 +28,7 @@ gauges and displays.
 
 import serial
 import time
+from exosite import exosite
 
 class GUI(object):
 	def __init__(self, rPI = True):
@@ -44,11 +45,11 @@ class GUI(object):
 			GPIO.setmode(GPIO.BCM)
 			GPIO.setup(self.RDY, GPIO.OUT)
 
-			self.setRDYstate(1)
+			#self.setRDYstate(1)
 
 			self.showIntro()
 
-			self.setRDYstate(0)			
+			#self.setRDYstate(0)			
 
 			GPIO.setup(self.RST, GPIO.OUT)
 			self.sendRST()
@@ -92,12 +93,14 @@ class GUI(object):
 
 class logger(object):
 
-	RF_TIMEOUT = 30 #Timeout seconds between MSP430 uC
+	RF_TIMEOUT = 10 #Timeout seconds between MSP430 uC
+	CIK = '8f3af3df6ee1ea3340ef9897ca6c139a160859e6'
 
 	def __init__(self, rPI = True, url = ""):
 		self.url = url
 		self.rPI = rPI
 		self.fileName = self.getFileName()
+		self.exo = exosite(self.CIK)
 
 		if rPI:
 			#self.PORT = '/dev/ttyACM0'
@@ -112,7 +115,13 @@ class logger(object):
 
 		self.gui = GUI(self.rPI)
 
+		self.gui.setRDYstate(1)
+		self.gui.setRDYstate(0)
+
+		time.sleep(0.5)
+
 		self.sendTimeOut()
+
 
 	def openSerial(self):
 		try:
@@ -142,10 +151,8 @@ class logger(object):
 			return None
 
 
-#------------------SEND TIMEOUT VIA UART TO ROUTERSTATION MSP430
-
 	def sendTimeOut(self):
-		self.uart.write('T' + str(RF_TIMEOUT) + ';')
+		self.uart.write(str(self.RF_TIMEOUT) + ';')
 
 	def cleanSerialData(self, data):
 		ALLOWED_CHARACTERS = [32, 35, 44]
@@ -187,12 +194,10 @@ class logger(object):
 			archivo.close()
 
 	def uploadData(self, data):
-		'''
-		Here is where data will be uploaded
-		to Exosite. Coding a new class to do this
-		isn't a bad idea.
-		'''
-		pass
+		if(self.exo.formatAndUpdateData(data)):
+			self.exo.pushData()
+		else:
+			'No se puede subir a Exosite!'
 
 	def getRPi(self):
 		return self.rPI
@@ -237,11 +242,14 @@ try:
 		data += '\n'
 		if len(data) > 3:
 			log.appendData(data)
+			log.uploadData(data[:-1])
 			print data,
 			log.gui.lcdClear()
 			log.gui.lcdMessage(str(data))
 		else:
 			log.gui.sendRST()
+			time.sleep(1)
+			log.sendTimeOut()
 			print "WDT RESET!"
 			now = log.getCurrentTime()
 			while(log.getCurrentTime() != now):

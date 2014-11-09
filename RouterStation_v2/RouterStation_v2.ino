@@ -29,12 +29,14 @@ const char *str_off = "OFF";
 const char *STR_RQST_DATA = "DATA";
 const char *STR_SET_TIMEOUT = "TIMEOUT";
 
+const char END_CHAR = ';';
+
 const int DATA_LEN = 6;
 const int BUFFER_SIZE = 33;
 
 char inbuf[BUFFER_SIZE];
 
-unsigned int TIME_OUT = 30;
+unsigned int TIME_OUT = 0;
 byte STATIONS_COUNT = 0;
 unsigned int sensorData[DATA_LEN];
 byte failed=0; //Failed attempts to get data in current sampling
@@ -61,8 +63,24 @@ void countRemoteStations(void){
   STATIONS_COUNT = cnt;
 }
 
+
 void reset(){
   WDTCTL = 0xFFFF; //Access violation to WDT causes software reset
+}
+
+void setTimeOut(void){
+  char dataChar = '0';
+  unsigned int tOt = 0;
+  while (dataChar != END_CHAR){
+    if(Serial.available() > 0){
+      dataChar = Serial.read();
+      if (dataChar != END_CHAR){
+        tOt = tOt*10 + (dataChar - 48);
+      }else{
+        TIME_OUT = tOt;
+      }
+    }
+  }
 }
 
 void setup() {
@@ -83,6 +101,12 @@ void setup() {
   }
 
   Serial.begin(9600);
+  
+  setTimeOut();
+  
+  //TIME_OUT = getTimeOut(); //Read desired timeout from Gateway (RPi)
+  //TIME_OUT = 10; //Read desired timeout from Gateway (RPi)
+  
   countRemoteStations(); //set value on STATIONS_COUNT variable
 
   delay(100); //Initial setup delay
@@ -299,23 +323,6 @@ void loop() {
   for(stn = 1; stn <= STATIONS_COUNT; stn++){
     delay(50);
     if(RQSTandReadData(stn, inbuf)){
-      //digitalWrite(CS_SD_PIN, LOW);
-
-      //Intentar con LSEEK para mover el puntero
-      //y reabrir el puerto cada vez que se utilice
-      //initSDcard();
-      //openSDfile();
-      /*if(enableSD){
-       initSDcard();
-       openSDfile();
-       Serial.println("SD OK!");
-       writeSDdate();
-       
-       writeSDtime();
-       writeToSD(inbuf);
-       
-       }*/
-      //FOR EACH STATION, STORE DATA IN SD CARD HERE!
       ;
     }
   }
@@ -329,15 +336,7 @@ void loop() {
     now = timeMinutes();
     __bis_status_register(LPM1_bits);
   }
-  reset();
-
-  /*
-  if(!digitalRead(PUSH2)){
-   delay(100);
-   rc = FatFs.write(0, 0, &bw);
-   die(-1);
-   }
-   */
+  //reset();
 
 }
 
