@@ -1,5 +1,6 @@
 import urllib 
 import httplib
+import socket
 
 class exosite(object):
 
@@ -55,12 +56,18 @@ class exosite(object):
 		conn.set_debuglevel(0)
 		url = '/api:v1/stack/alias'
 		headers = {'X-Exosite-CIK': self.CIK, 'content-type': 'application/x-www-form-urlencoded; charset=utf-8'} 
-		conn.request("POST", url, params, headers)
-		response = conn.getresponse();
-		data = response.read()
-		end = data.find('<')
-		if -1 == end: end = len(data)
-		conn.close()
+		try:
+			conn.request("POST", url, params, headers)
+			response = conn.getresponse();
+			data = response.read()
+			end = data.find('<')
+			if -1 == end: end = len(data)
+			conn.close()
+		except KeyboardInterrupt:
+			print 'Adios!'
+			exit()
+		except:
+			print "Sin conexion a Internet. Almacenando localmente..."
 
 """
 cik = '8f3af3df6ee1ea3340ef9897ca6c139a160859e6'
