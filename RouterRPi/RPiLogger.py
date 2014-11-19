@@ -229,7 +229,7 @@ class logger(object):
 		return dateTime
 
 	def getFileName(self):
-		return self.getCurrentDate() + '_' + self.getCurrentTime() + '.csv'		
+		return '/home/pi/WSN/' + self.getCurrentDate() + '_' + self.getCurrentTime() + '.csv'		
 
 
 log = logger(True)
