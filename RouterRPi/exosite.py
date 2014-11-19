@@ -68,7 +68,3 @@ class exosite(object):
 			exit()
 		except:
 			print "Sin conexion a Internet. Almacenando localmente..."
-
-"""
-cik = '8f3af3df6ee1ea3340ef9897ca6c139a160859e6'
-"""
