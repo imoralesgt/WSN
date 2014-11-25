@@ -9,9 +9,11 @@
 
 #define SENSOR_COUNT 4
 
-const byte IRQ_PIN      = P2_2; //NRF24L01+ IRQ Pin
+//const byte IRQ_PIN      = P2_2; //NRF24L01+ IRQ Pin
+const byte CS_PIN      = P2_2; //NRF24L01+ CS Pin
 const byte CE_PIN       = P2_0; //NRF24L01+ CE Pin
-const byte CS_PIN       = P2_1; //NRF24L01+ CS Pin
+//const byte CS_PIN       = P2_1; //NRF24L01+ CS Pin
+const byte IRQ_PIN       = P2_1; //NRF24L01+ IRQ Pin
 const byte HUM_PIN      = P1_4; //DHT11 Data Pin
 const byte LED1         = P1_0; //RED LED Pin
 const byte ADDR_PINS[3] = {P2_3, P2_4, P2_5};

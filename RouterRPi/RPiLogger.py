@@ -93,7 +93,7 @@ class GUI(object):
 
 class logger(object):
 
-	RF_TIMEOUT = 10 #Timeout seconds between MSP430 uC
+	RF_TIMEOUT = 120 #Timeout seconds between MSP430 uC
 	CIK = '8f3af3df6ee1ea3340ef9897ca6c139a160859e6'
 
 	def __init__(self, rPI = True, url = ""):
